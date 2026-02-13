@@ -3,38 +3,33 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 export class GeminiService {
   /**
-   * 根據 @google/genai 最新開發規範：
-   * 1. 必須使用 GoogleGenAI 類別（GoogleGenerativeAI 已棄用）。
-   * 2. API Key 必須嚴格從 process.env.API_KEY 取得。
-   * 3. 初始化必須使用具名參數物件 { apiKey: process.env.API_KEY }。
+   * 根據規範，我們維持使用 process.env.API_KEY。
+   * Vite 的 define 配置會在建置時處理好瀏覽器端映射。
    */
   private createClient() {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API_KEY is missing! Please set it in Vercel Environment Variables.");
+    }
+    return new GoogleGenAI({ apiKey: apiKey || '' });
   }
 
   async getTravelAdvice(query: string, userLocation?: { lat: number; lng: number }) {
     try {
       const ai = this.createClient();
       
-      // 使用 gemini-3-flash-preview 模型處理旅遊諮詢
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `你是一位熱愛釜山的專業旅遊達人。使用者詢問：「${query}」。
-        請針對 2024 年 6 月份的釜山氣候（初夏、梅雨季準備）與在地活動（如太宗台繡球花節、海雲台沙雕展），
-        以「繁體中文」提供具體、親切且充滿溫度的建議。`,
+        contents: query,
         config: {
-          // 啟用 Google Search Grounding 以獲取最新資訊
+          systemInstruction: `你是一位熱愛釜山的專業旅遊達人。請針對 2024 年 6 月份的釜山氣候（初夏、梅雨季準備）與在地活動（如太宗台繡球花節、海雲台沙雕展），以「繁體中文」提供具體、親切且充滿溫度的建議。`,
           tools: [{ googleSearch: {} }]
         }
       });
 
-      /**
-       * 規範要求：
-       * .text 是一個屬性而非方法，不可加括號 ()。
-       */
-      const text = response.text || "抱歉，我現在無法回答這個問題，請稍後再試。";
+      // 嚴格遵守規範：.text 是 getter 屬性
+      const text = response.text || "抱歉，我現在無法回答這個問題。";
       
-      // 提取搜尋接地 (Search Grounding) 的參考連結
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const links = chunks
         .filter(c => c.web)
@@ -46,9 +41,8 @@ export class GeminiService {
       return { text, links };
     } catch (error) {
       console.error("Gemini API Error:", error);
-      // 錯誤處理：若 API Key 尚未設定或請求失敗
       return { 
-        text: "連線至釜山助手時發生異常。請確保您的環境變數 API_KEY 已正確設定。", 
+        text: "連線至釜山助手時發生異常。請檢查 Vercel 的 API_KEY 設定是否正確，並確保專案已重新部署。", 
         links: [] 
       };
     }

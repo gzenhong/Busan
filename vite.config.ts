@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // 解決 Vercel 環境變數注入問題，這是符合規範的寫法
+    // 將 Vercel 的環境變數注入到前端程式碼中
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   },
   build: {
@@ -14,5 +14,8 @@ export default defineConfig({
         main: './index.html'
       }
     }
+  },
+  server: {
+    port: 3000
   }
 });

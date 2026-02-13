@@ -2,7 +2,7 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 export class GeminiService {
   private getApiKey(): string {
-    // 讀取由 Vite 注入的字串
+    // 優先讀取 Vite 注入的變數
     const key = process.env.API_KEY || "";
     return key.trim();
   }
@@ -10,14 +10,14 @@ export class GeminiService {
   async getTravelAdvice(query: string, userLocation?: { lat: number; lng: number }) {
     const apiKey = this.getApiKey();
     
-    // 安全地顯示 Key 狀態用於診斷
+    // 診斷資訊
     const keyStatus = apiKey 
-      ? `已偵測到 Key (前4碼: ${apiKey.substring(0, 4)}...)` 
-      : "❌ 找不到 API Key (process.env.API_KEY 為空)";
+      ? `已偵測到 Key (長度: ${apiKey.length}, 前4碼: ${apiKey.substring(0, 4)}...)` 
+      : "❌ API Key 為空 (process.env.API_KEY 注入失敗)";
 
     if (!apiKey) {
       return { 
-        text: `【診斷錯誤】\n${keyStatus}\n\n原因：Vite 在打包時未能正確注入環境變數。請確保已在 Vercel 設定 API_KEY 並執行了 Redeploy。`, 
+        text: `【系統診斷】\n${keyStatus}\n\n請檢查 Vercel Environment Variables 設定。`, 
         links: [] 
       };
     }
@@ -25,17 +25,17 @@ export class GeminiService {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
+      // 使用正確的模型名稱
       const response: GenerateContentResponse = await ai.models.generateContent({
-        // 依照指南使用 gemini-3-flash-preview
         model: 'gemini-3-flash-preview', 
         contents: [{ parts: [{ text: query }] }],
         config: {
-          systemInstruction: "你是一位熱愛釜山的專業旅遊達人。請針對 2024 年 6 月份的釜山氣候、美食與活動提供繁體中文建議。若使用 Google 搜尋，請提供實用的網址。",
+          systemInstruction: "你是一位熱愛釜山的旅遊專家。請用繁體中文回答，並針對 2024 年 6 月提供建議。請務必使用 Google Search 工具獲取最新資訊。",
           tools: [{ googleSearch: {} }]
         }
       });
 
-      const text = response.text || "模型未回傳文字內容。";
+      const text = response.text || "模型未回傳文字。";
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       const links = chunks
         .filter(c => c.web)
@@ -46,15 +46,14 @@ export class GeminiService {
 
       return { text, links };
     } catch (error: any) {
-      console.error("Gemini API Error Details:", error);
+      console.error("Gemini API Error:", error);
       
-      let errorDetail = error.message || "未知錯誤";
-      if (typeof error === 'object' && error !== null) {
-        errorDetail = JSON.stringify(error);
-      }
-      
+      let errorMsg = "連線失敗";
+      if (error?.message) errorMsg = error.message;
+      else if (typeof error === 'object') errorMsg = JSON.stringify(error);
+
       return { 
-        text: `【連線異常】\n診斷資訊：${keyStatus}\n錯誤詳細內容：${errorDetail}\n\n提示：請確認您的 API Key 是否具備 Gemini 3 系列模型的存取權限。`, 
+        text: `【API 連線異常】\n診斷：${keyStatus}\n錯誤內容：${errorMsg}\n\n提示：如果錯誤訊息仍提到 'gemini-1.5-flash'，請檢查是否已在 Vercel 點擊 Redeploy。`, 
         links: [] 
       };
     }

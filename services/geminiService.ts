@@ -1,7 +1,6 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
-// 升級版本標記為 V4，確認切換至穩定版模型
-const APP_VERSION = "2024.06.BUSAN-V4-STABLE";
+const APP_VERSION = "2024.06.BUSAN-V5-FAST";
 
 export class GeminiService {
   private getApiKey(): string {
@@ -14,63 +13,57 @@ export class GeminiService {
     
     if (!apiKey) {
       return { 
-        text: `【版本: ${APP_VERSION}】\n❌ 未偵測到 API Key。請在 Vercel 設定中添加 API_KEY 並重新部署。`, 
+        text: `【系統提示】尚未在 Vercel 設定 API_KEY。`, 
         links: [] 
       };
     }
 
     try {
-      // 每次請求都建立新實例，確保使用最新 Key
+      // 建立 AI 實例
       const ai = new GoogleGenAI({ apiKey });
       
       /**
-       * 使用 'gemini-flash-latest' 替代 preview 版本。
-       * 穩定版模型對於免費 Key 的配額限制通常較寬鬆。
+       * 使用 gemini-3-flash-preview。
+       * 移除 tools: [{ googleSearch: {} }]，因為這是導致免費 Key 頻繁出現 429 的主因。
        */
       const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-flash-latest', 
+        model: 'gemini-3-flash-preview', 
         contents: [{ parts: [{ text: query }] }],
         config: {
-          systemInstruction: `你是一位專業的釜山旅遊專家。請用繁體中文回答旅人的問題。
-          當前版本：${APP_VERSION}。
-          請優先考慮 2024 年 6 月的活動、天氣（梅雨季提醒）與交通建議。`,
-          tools: [{ googleSearch: {} }]
+          systemInstruction: `你是一位資深的釜山旅遊專家。
+          請用親切、專業的繁體中文回答。
+          你的目標是協助使用者規劃 2024 年 6 月的釜山自由行。
+          請提供具體的景點、美食建議與天氣提醒（6月為初夏，下旬可能有梅雨）。
+          當前版本標記：${APP_VERSION}。`,
+          // 暫時停用工具以確保連線穩定
         }
       });
 
-      const text = response.text || "抱歉，我現在無法生成回答，請稍後再試。";
+      const text = response.text || "抱歉，目前 AI 回應出現空白，請稍後再試。";
       
-      // 提取參考連結
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      const links = chunks
-        .filter(c => c.web)
-        .map(c => ({
-          title: c.web?.title || "參考來源",
-          uri: c.web?.uri || "#"
-        }));
+      // 由於停用了 Google Search，groundingChunks 會是空的
+      const links: {title: string, uri: string}[] = [];
 
-      return { text: `【${APP_VERSION}】\n${text}`, links };
+      return { text: text, links };
     } catch (error: any) {
-      console.error("Gemini API Error:", error);
+      console.error("Gemini API Error Detail:", error);
       
-      // 針對 429 錯誤提供友善提示
-      if (error?.status === 429 || (error?.message && error.message.includes("429"))) {
+      if (error?.status === 429 || error?.message?.includes("429")) {
         return {
-          text: `【系統過載】\n由於 Gemini 免費版 API 的限制，目前的請求次數已達上限。請等待約 1 分鐘後再試。`,
+          text: `【API 配額提醒】\n目前的請求過於頻繁（Google 免費版 API 限制）。請稍等約 30-60 秒後再試一次，或嘗試縮短您的問題。`,
           links: []
         };
       }
-
-      const errorDetail = error?.message || JSON.stringify(error);
+      
       return { 
-        text: `【連線異常 - ${APP_VERSION}】\n錯誤詳細資訊：${errorDetail}\n\n若持續出現此錯誤，請確認 API Key 是否有效。`, 
+        text: `【連線異常】發生了未預期的錯誤。請確認您的 API Key 是否正確設定於 Vercel 的 Environment Variables 中。\n(Error: ${error?.status || 'Unknown'})`, 
         links: [] 
       };
     }
   }
 
   async getJuneEvents() {
-    return this.getTravelAdvice("2024年6月釜山有什麼特別的活動？例如太宗台繡球花節。");
+    return this.getTravelAdvice("請列出 2024 年 6 月釜山的重要活動，如太宗台繡球花節。");
   }
 }
 

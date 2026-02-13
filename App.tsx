@@ -1,9 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { Layout } from './components/Layout';
 import { Itinerary } from './components/Itinerary';
 import { GeminiAssistant } from './components/GeminiAssistant';
-import { BUSAN_DEFAULT_ITINERARY } from './constants.tsx';
+import { BUSAN_DEFAULT_ITINERARY } from './constants';
 
 const App: React.FC = () => {
   const [scrollPos, setScrollPos] = useState(0);

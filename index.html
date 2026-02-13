@@ -50,7 +50,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
-  <!-- 使用相對路徑，並移除干擾建置的 importmap -->
-  <script type="module" src="./index.tsx"></script>
+  <!-- 這是唯一的入口點，Vite 會從這裡開始追蹤並打包所有相依性 -->
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>

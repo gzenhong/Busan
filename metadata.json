@@ -1,0 +1,7 @@
+{
+  "name": "釜山漫遊：6月 5天4夜自由行規劃",
+  "description": "專為 6 月份釜山之旅設計的高端旅遊規劃應用。包含 AI 驅動的在地推薦、即時資訊查詢與 5 天 4 夜精選行程。",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
